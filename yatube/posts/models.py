@@ -89,6 +89,7 @@ class Comment(models.Model):
         auto_now_add=True
     )
 
+
 class Follow(models.Model):
     user = models.ForeignKey(
         User,
