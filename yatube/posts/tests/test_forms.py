@@ -164,6 +164,5 @@ class PostCreateFormTests(TestCase):
             data=form_data,
             follow=True
         )
-        expected_url = self.REDIRECT_LOGIN
-        self.assertRedirects(response, expected_url)
+        self.assertRedirects(response, self.REDIRECT_LOGIN)
         self.assertEqual(self.post.comments.count(), comment_count)

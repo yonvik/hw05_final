@@ -5,6 +5,7 @@ from django.core.cache import cache
 from posts.models import Group, Post, User
 
 INDEX_URL = reverse('posts:index')
+FOLLOW_URL = reverse('posts:follow_index')
 CREATE_URL = reverse('posts:post_create')
 GROUP_URL = reverse('posts:group_list', args=['slug'])
 PAGE_404 = reverse('posts:error_404')
@@ -56,7 +57,9 @@ class StaticURLTests(TestCase):
             [self.EDIT_URL, self.author, 200],
             [self.EDIT_URL, self.another, 302],
             [PAGE_404, self.guest, 404],
-            [PAGE_500, self.guest, 500]
+            [PAGE_500, self.guest, 500],
+            [FOLLOW_URL, self.guest, 302],
+            [FOLLOW_URL, self.author, 200]
         ]
         for url, client, status in urls:
             with self.subTest(url=url, client=client):
@@ -73,7 +76,8 @@ class StaticURLTests(TestCase):
             CREATE_URL: 'posts/create_post.html',
             PAGE_404: 'core/404.html',
             PAGE_403: 'core/403csrf.html',
-            PAGE_500: 'core/500.html'
+            PAGE_500: 'core/500.html',
+            FOLLOW_URL: 'posts/follow.html'
         }
         for reverse_name, template in templates_pages_names.items():
             with self.subTest(reverse_name=reverse_name):

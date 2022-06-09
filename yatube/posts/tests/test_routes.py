@@ -12,6 +12,7 @@ URLS = [
     [f'/profile/{USER}/', 'profile', (USER, )],
     [f'/posts/{POST_ID}/edit/', 'post_edit', (POST_ID, )],
     [f'/posts/{POST_ID}/', 'post_detail', (POST_ID, )],
+    [f'/follow/', 'follow_index', ()]
 ]
 
 
