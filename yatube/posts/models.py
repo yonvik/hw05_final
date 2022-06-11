@@ -89,6 +89,10 @@ class Comment(models.Model):
         auto_now_add=True
     )
 
+    class Meta:
+        verbose_name = 'Комментарий'
+        verbose_name_plural = 'Комментарии'
+
 
 class Follow(models.Model):
     user = models.ForeignKey(
@@ -103,3 +107,11 @@ class Follow(models.Model):
         related_name='following',
         verbose_name='Автор',
         blank=True)
+
+    class Meta:
+        verbose_name = 'Подписки'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'author'],
+                name='unique_follower')
+        ]
