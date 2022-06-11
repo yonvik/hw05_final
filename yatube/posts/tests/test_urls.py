@@ -31,17 +31,17 @@ class StaticURLTests(TestCase):
             slug='slug',
             description='Описание'
         )
+        cls.guest = Client()
+        cls.author = Client()
+        cls.another = Client()
         cls.another_author = User.objects.create_user(username='test_user2')
         cls.DETAIL_URL = reverse('posts:post_detail', args=[cls.post.id])
         cls.EDIT_URL = reverse('posts:post_edit', args=[cls.post.id])
         cls.REDIRECT_EDIT = f'{LOGIN_URL}?next={cls.EDIT_URL}'
+        cls.author.force_login(cls.post.author)
+        cls.another.force_login(cls.another_author)
 
     def setUp(self):
-        self.guest = Client()
-        self.author = Client()
-        self.author.force_login(self.post.author)
-        self.another = Client()
-        self.another.force_login(self.another_author)
         cache.clear()
 
     def test_pages_for_guests(self):
@@ -79,10 +79,10 @@ class StaticURLTests(TestCase):
             PAGE_500: 'core/500.html',
             FOLLOW_URL: 'posts/follow.html'
         }
-        for reverse_name, template in templates_pages_names.items():
-            with self.subTest(reverse_name=reverse_name):
+        for url, template in templates_pages_names.items():
+            with self.subTest(url=url):
                 self.assertTemplateUsed(
-                    self.author.get(reverse_name), template)
+                    self.author.get(url), template)
 
     def test_redirect(self):
         """Тесты перенаправлений"""

@@ -29,6 +29,7 @@
     </header>
     <main>
       {% block content %}
+      {% include 'includes/body.html'%}
       {% include 'posts/includes/paginator.html' %}
       {% endblock content %}
     </main>

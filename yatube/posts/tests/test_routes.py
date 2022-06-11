@@ -3,6 +3,7 @@ from django.urls import reverse
 
 SLUG = 'slug'
 USER = 'user'
+ROUTE_POST = 'posts'
 POST_ID = 1
 
 URLS = [
@@ -21,4 +22,5 @@ class TaskPagesTests(TestCase):
         """Тест маршрутов"""
         for url, route, args in URLS:
             with self.subTest(urls=url, route=route):
-                self.assertEqual(url, reverse(f'posts:{route}', args=args))
+                self.assertEqual(url,
+                                 reverse(f'{ROUTE_POST}:{route}', args=args))

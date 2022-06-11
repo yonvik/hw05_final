@@ -19,6 +19,14 @@ GROUP_SLUG2 = reverse('posts:group_list', args=['test_slug'])
 USER = 'test_user'
 USER2 = 'test_follower'
 PROFILE_URL = reverse('posts:profile', args=[USER])
+SMALL_GIF = (
+    b'\x47\x49\x46\x38\x39\x61\x02\x00'
+    b'\x01\x00\x80\x00\x00\x00\x00\x00'
+    b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+    b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+    b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+    b'\x0A\x00\x3B'
+)
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
@@ -28,17 +36,9 @@ class TaskPagesTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.SMALL_GIF = (
-            b'\x47\x49\x46\x38\x39\x61\x02\x00'
-            b'\x01\x00\x80\x00\x00\x00\x00\x00'
-            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
-            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
-            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
-            b'\x0A\x00\x3B'
-        )
         cls.image = SimpleUploadedFile(
             name='small.gif',
-            content=cls.SMALL_GIF,
+            content=SMALL_GIF,
             content_type='image/gif'
         )
         cls.author = User.objects.create_user(username=USER)
@@ -58,6 +58,13 @@ class TaskPagesTests(TestCase):
             description='Описание'
         )
         cls.DETAIL_URL = reverse('posts:post_detail', args=[cls.post.id])
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.post.author)
+        cls.follower = User.objects.create(username=USER2)
+        cls.follower_client = Client()
+        cls.follower_client.force_login(cls.author)
+        cls.PROFILE_FOLLOW = reverse('posts:profile_follow',
+                                     args=[USER2])
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -65,8 +72,6 @@ class TaskPagesTests(TestCase):
         shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
 
     def setUp(self):
-        self.authorized_client = Client()
-        self.authorized_client.force_login(self.post.author)
         cache.clear()
 
     def test_pages_context(self):
@@ -75,8 +80,10 @@ class TaskPagesTests(TestCase):
             INDEX_URL: 'page_obj',
             GROUP_SLUG: 'page_obj',
             PROFILE_URL: 'page_obj',
-            self.DETAIL_URL: 'post'
+            self.DETAIL_URL: 'post',
+            FOLLOW_URL: 'page_obj',
         }
+        Follow.objects.create(user=self.author, author=self.author)
         for url, context in urls.items():
             posts = self.authorized_client.get(url).context[context]
             with self.subTest(url=url):
@@ -106,8 +113,14 @@ class TaskPagesTests(TestCase):
 
     def test_post_not_in_other_group(self):
         """Пост не попал в другую группу"""
-        response = self.authorized_client.get(GROUP_SLUG2)
-        self.assertNotIn(self.post, response.context['page_obj'])
+        urls = {
+            GROUP_SLUG2: 'page_obj',
+            FOLLOW_URL: 'page_obj',
+        }
+        for url, context in urls.items():
+            with self.subTest(url=url):
+                response = self.authorized_client.get(url)
+                self.assertNotIn(self.post, response.context[context])
 
     def test_cache_index_page(self):
         """Проверка работы кэша"""
@@ -166,50 +179,33 @@ class FollowViewsTest(TestCase):
             author=cls.autor,
         )
         cls.PROFILE_FOLLOW = reverse('posts:profile_follow',
-                                     args=[cls.follower])
+                                     args=[USER])
         cls.PROFILE_UNFOLLOW = reverse('posts:profile_unfollow',
-                                       args=[cls.follower])
-
-    def setUp(self):
-        cache.clear()
-        self.author_client = Client()
-        self.author_client.force_login(self.follower)
-        self.follower_client = Client()
-        self.follower_client.force_login(self.autor)
-
-    def test_follow_on_user(self):
-        """Тест подписки на пользователя."""
-        count_follow = Follow.objects.count()
-        self.follower_client.post(self.PROFILE_FOLLOW)
-        follow = Follow.objects.all().latest('id')
-        self.assertEqual(Follow.objects.count(), count_follow + 1)
-        self.assertEqual(follow.author_id, self.follower.id)
-        self.assertEqual(follow.user_id, self.autor.id)
+                                       args=[USER2])
+        cls.author_client = Client()
+        cls.author_client.force_login(cls.follower)
+        cls.follower_client = Client()
+        cls.follower_client.force_login(cls.autor)
 
     def test_unfollow_on_user(self):
         """Тест отписки от пользователя."""
+        before_unfollow = Follow.objects.count()
+        self.assertEqual(before_unfollow, 0)
         Follow.objects.create(
             user=self.autor,
             author=self.follower)
-        count_follow = Follow.objects.count()
-        self.follower_client.post(self.PROFILE_UNFOLLOW)
-        self.assertEqual(Follow.objects.count(), count_follow - 1)
+        self.assertEqual(Follow.objects.count(), 1)
+        self.follower_client.get(self.PROFILE_UNFOLLOW)
+        self.assertEqual(Follow.objects.count(), 0)
 
     def test_follow_on_authors(self):
         """Тест записей у тех кто подписан."""
-        post = Post.objects.create(
-            author=self.autor,
-            text=self.post.text)
-        Follow.objects.create(
-            user=self.follower,
-            author=self.autor)
-        response = self.author_client.get(FOLLOW_URL)
-        self.assertIn(post, response.context['page_obj'].object_list)
-
-    def test_notfollow_on_authors(self):
-        """Тест записей у тех кто не подписан."""
-        post = Post.objects.create(
-            author=self.autor,
-            text=self.post.text)
-        response = self.author_client.get(FOLLOW_URL)
-        self.assertNotIn(post, response.context['page_obj'].object_list)
+        count_before = Post.objects.filter(
+            author__following__user=self.autor).count()
+        post = Post.objects.create(text=self.post.text, author=self.follower)
+        Follow.objects.create(user=self.autor, author=post.author)
+        count_after = Post.objects.filter(
+            author__following__user=self.post.author).count()
+        self.assertEqual(count_after, count_before + 1)
+        page = self.follower_client.get(FOLLOW_URL)
+        self.assertEqual(len(page.context.get('page_obj')), count_before + 1)
