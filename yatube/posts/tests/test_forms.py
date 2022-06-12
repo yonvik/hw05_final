@@ -11,6 +11,7 @@ from django.urls import reverse
 from posts.models import Group, Post, User, Comment
 
 USER = 'user'
+USER2 = 'another'
 INDEX_URL = reverse('posts:index')
 CREATE = reverse('posts:post_create')
 PROFILE = reverse('posts:profile', args=[USER])
@@ -48,6 +49,12 @@ class PostCreateFormTests(TestCase):
             content_type='image/gif'
         )
         cls.author = User.objects.create_user(username=USER)
+        cls.guest_client = Client()
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.author)
+        cls.another = User.objects.create_user(username=USER2)
+        cls.another_client = Client()
+        cls.another_client.force_login(cls.another)
         cls.post = Post.objects.create(
             group=cls.group,
             author=cls.author,
@@ -63,15 +70,12 @@ class PostCreateFormTests(TestCase):
         cls.POST_DETAL = reverse('posts:post_detail', args=[cls.post.id])
         cls.COMMET_URL = reverse('posts:add_comment', args=[cls.post.id])
         cls.REDIRECT_LOGIN = f'{LOGIN_URL}?next={cls.COMMET_URL}'
-        cls.guest_client = Client()
-        cls.authorized_client = Client()
-        cls.authorized_client.force_login(cls.author)
 
     def test_create_post(self):
         """Тест создания новой записи"""
         post_count = Post.objects.count()
         uploaded = SimpleUploadedFile(
-            name='small.gif',
+            name='small1.gif',
             content=SMALL_GIF,
             content_type='image/gif'
         )
@@ -87,12 +91,13 @@ class PostCreateFormTests(TestCase):
         )
         self.assertRedirects(response, PROFILE)
         self.assertEqual(Post.objects.count(), post_count + 1)
-        post_order = Post.objects.order_by('id')
-        post = post_order.reverse()[0]
+        posts_exclude = Post.objects.exclude(id=self.post.id)
+        self.assertEqual(posts_exclude.count(), 1)
+        post = posts_exclude[0]
         self.assertEqual(post.text, form_data['text'])
         self.assertEqual(post.author, self.author)
         self.assertEqual(post.group.id, form_data['group'])
-        self.assertEqual(post.image.read(), self.post.image.read())
+        self.assertEqual(post.image.name, 'posts/' + form_data['image'].name)
 
     def test_post_create_correct_context(self):
         """Шаблоны сформированы с правильным контекстом."""
@@ -115,10 +120,15 @@ class PostCreateFormTests(TestCase):
     def test_edit_post(self):
         """Тест изминения id после редактирования"""
         post = self.post
+        uploaded = SimpleUploadedFile(
+            name='small2.gif',
+            content=SMALL_GIF,
+            content_type='image/gif'
+        )
         form_data = {
             'text': self.post.text,
             'group': self.group_2.id,
-            'image': PostCreateFormTests.test_create_post
+            'image': uploaded
         }
         response = self.authorized_client.post(
             self.POST_EDIT,
@@ -131,14 +141,13 @@ class PostCreateFormTests(TestCase):
         self.assertEqual(post.text, form_data['text'])
         self.assertEqual(post.group_id, form_data['group'])
         self.assertEqual(post.author, self.post.author)
-        self.assertEqual(post.image.read(), SMALL_GIF)
+        self.assertEqual(post.image.name, 'posts/' + form_data['image'].name)
 
     def test_add_comment(self):
         """Тест добавления комментария к посту"""
         comment_count = self.post.comments.count()
         form_data = {
-            'text': 'комментарий',
-            'author': self.author
+            'text': 'комментарий'
         }
         response = self.authorized_client.post(
             self.COMMET_URL,
@@ -148,16 +157,13 @@ class PostCreateFormTests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertRedirects(response, self.POST_DETAL)
         self.assertEqual(self.post.comments.count(), comment_count + 1)
-        comment = response.context['post'].comments.all().last()
+        comment = Comment.objects.all()[0]
         self.assertEqual(comment.text, form_data['text'])
-        self.assertEqual(comment.author, self.author)
 
     def test_add_comment_not_login_user(self):
         """Тест создания комментария только авторизированным пользователем"""
-        comment_count = Comment.objects.count()
         form_data = {
-            'text': 'комментарий',
-            'author': self.author
+            'text': 'комментарий'
         }
         response = self.guest_client.post(
             self.COMMET_URL,
@@ -165,4 +171,50 @@ class PostCreateFormTests(TestCase):
             follow=True
         )
         self.assertRedirects(response, self.REDIRECT_LOGIN)
-        self.assertEqual(Comment.objects.count(), comment_count)
+        self.assertEqual(Comment.objects.count(), 0)
+
+    def test_post_edit_guest(self):
+        """Тест анонима отредактировать пост"""
+        uploaded = SimpleUploadedFile(
+            name='small2.gif',
+            content=SMALL_GIF,
+            content_type='image/gif'
+        )
+        form_data = {
+            'text': self.post.text,
+            'group': self.group_2.id,
+            'image': uploaded
+        }
+        post = Post.objects.get(id=self.post.id)
+        response = self.guest_client.post(
+            self.COMMET_URL,
+            data=form_data,
+            follow=True
+        )
+        self.assertRedirects(response, self.REDIRECT_LOGIN)
+        self.assertEqual(post.text, self.post.text)
+        self.assertEqual(post.group, self.post.group)
+        self.assertEqual(post.image, self.post.image)
+
+    def test_post_edit_another(self):
+        """Тест не-автора отредактировать пост"""
+        uploaded = SimpleUploadedFile(
+            name='small2.gif',
+            content=SMALL_GIF,
+            content_type='image/gif'
+        )
+        form_data = {
+            'text': self.post.text,
+            'group': self.group_2.id,
+            'image': uploaded
+        }
+        post = Post.objects.get(id=self.post.id)
+        response = self.another_client.post(
+            self.COMMET_URL,
+            data=form_data,
+            follow=True
+        )
+        self.assertRedirects(response, self.POST_DETAL)
+        self.assertEqual(post.text, self.post.text)
+        self.assertEqual(post.group, self.post.group)
+        self.assertEqual(post.image, self.post.image)

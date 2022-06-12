@@ -19,6 +19,8 @@ GROUP_SLUG2 = reverse('posts:group_list', args=['test_slug'])
 USER = 'test_user'
 USER2 = 'test_follower'
 PROFILE_URL = reverse('posts:profile', args=[USER])
+PROFILE_FOLLOW = reverse('posts:profile_follow', args=[USER2])
+PROFILE_UNFOLLOW = reverse('posts:profile_unfollow', args=[USER2])
 SMALL_GIF = (
     b'\x47\x49\x46\x38\x39\x61\x02\x00'
     b'\x01\x00\x80\x00\x00\x00\x00\x00'
@@ -145,6 +147,8 @@ class PaginatorViewsTest(TestCase):
             title='Заголовок',
             slug=SLUG2,
             description='Описание')
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.author)
         Post.objects.bulk_create(Post(
             text=f'Тестовый пост {i}',
             author=cls.author,
@@ -159,12 +163,15 @@ class PaginatorViewsTest(TestCase):
             [GROUP_SLUG2, PAGE_SIZE],
             [GROUP_SLUG2 + '?page=2', 3],
             [PROFILE_URL, PAGE_SIZE],
-            [PROFILE_URL + '?page=2', 3]
+            [PROFILE_URL + '?page=2', 3],
+            [FOLLOW_URL, PAGE_SIZE],
+            [FOLLOW_URL + '?page=2', 3]
         ]
+        Follow.objects.create(user=self.author, author=self.author)
         for page, urls in list_urls:
             with self.subTest(page=page):
                 self.assertEqual(len(
-                    self.client.get(page).context.get(
+                    self.authorized_client.get(page).context.get(
                         'page_obj').object_list), urls)
 
 
@@ -178,34 +185,27 @@ class FollowViewsTest(TestCase):
             text='Тестовая подписка',
             author=cls.autor,
         )
-        cls.PROFILE_FOLLOW = reverse('posts:profile_follow',
-                                     args=[USER])
-        cls.PROFILE_UNFOLLOW = reverse('posts:profile_unfollow',
-                                       args=[USER2])
         cls.author_client = Client()
-        cls.author_client.force_login(cls.follower)
+        cls.author_client.force_login(cls.autor)
         cls.follower_client = Client()
-        cls.follower_client.force_login(cls.autor)
-
-    def test_unfollow_on_user(self):
-        """Тест отписки от пользователя."""
-        before_unfollow = Follow.objects.count()
-        self.assertEqual(before_unfollow, 0)
-        Follow.objects.create(
-            user=self.autor,
-            author=self.follower)
-        self.assertEqual(Follow.objects.count(), 1)
-        self.follower_client.get(self.PROFILE_UNFOLLOW)
-        self.assertEqual(Follow.objects.count(), 0)
+        cls.follower_client.force_login(cls.follower)
 
     def test_follow_on_authors(self):
         """Тест записей у тех кто подписан."""
-        count_before = Post.objects.filter(
-            author__following__user=self.autor).count()
-        post = Post.objects.create(text=self.post.text, author=self.follower)
-        Follow.objects.create(user=self.autor, author=post.author)
-        count_after = Post.objects.filter(
-            author__following__user=self.post.author).count()
-        self.assertEqual(count_after, count_before + 1)
-        page = self.follower_client.get(FOLLOW_URL)
-        self.assertEqual(len(page.context.get('page_obj')), count_before + 1)
+        Follow.objects.create(
+            user=self.follower,
+            author=self.autor)
+        self.follower_client.get(FOLLOW_URL)
+        self.assertTrue(
+            Follow.objects.filter(user=self.follower, author=self.autor)
+        )
+
+    def test_unfollow_on_user(self):
+        """Тест отписки от пользователя."""
+        Follow.objects.create(
+            user=self.autor,
+            author=self.follower)
+        self.follower_client.get(PROFILE_UNFOLLOW)
+        self.assertFalse(
+            Follow.objects.filter(user=self.follower, author=self.autor)
+        )

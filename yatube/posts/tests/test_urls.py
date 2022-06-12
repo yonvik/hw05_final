@@ -15,6 +15,8 @@ USER = 'test_user'
 PROFILE_URL = reverse('posts:profile', args=[USER])
 LOGIN_URL = reverse('login')
 REDIRECT_LOGIN = f'{LOGIN_URL}?next={CREATE_URL}'
+PROFILE_FOLLOW = reverse('posts:profile_follow', args=[USER])
+PROFILE_UNFOLLOW = reverse('posts:profile_unfollow', args=[USER])
 
 
 class StaticURLTests(TestCase):
@@ -40,6 +42,9 @@ class StaticURLTests(TestCase):
         cls.REDIRECT_EDIT = f'{LOGIN_URL}?next={cls.EDIT_URL}'
         cls.author.force_login(cls.post.author)
         cls.another.force_login(cls.another_author)
+        cls.REDIRECT_FOLLOW = f'{LOGIN_URL}?next={PROFILE_FOLLOW}'
+        cls.REDIRECT_UNFOLLOW = f'{LOGIN_URL}?next={PROFILE_UNFOLLOW}'
+        cls.REDIRECT_LOGIN = f'{LOGIN_URL}?next={FOLLOW_URL}'
 
     def setUp(self):
         cache.clear()
@@ -59,7 +64,11 @@ class StaticURLTests(TestCase):
             [PAGE_404, self.guest, 404],
             [PAGE_500, self.guest, 500],
             [FOLLOW_URL, self.guest, 302],
-            [FOLLOW_URL, self.author, 200]
+            [FOLLOW_URL, self.author, 200],
+            [PROFILE_FOLLOW, self.guest, 302],
+            [PROFILE_FOLLOW, self.author, 302],
+            [PROFILE_UNFOLLOW, self.guest, 302],
+            [PROFILE_UNFOLLOW, self.author, 404]
         ]
         for url, client, status in urls:
             with self.subTest(url=url, client=client):
@@ -89,7 +98,13 @@ class StaticURLTests(TestCase):
         urls = [
             [CREATE_URL, self.client, REDIRECT_LOGIN],
             [self.EDIT_URL, self.client, self.REDIRECT_EDIT],
-            [self.EDIT_URL, self.another, self.DETAIL_URL]
+            [self.EDIT_URL, self.another, self.DETAIL_URL],
+            [PROFILE_FOLLOW, self.client, self.REDIRECT_FOLLOW],
+            [PROFILE_FOLLOW, self.author, FOLLOW_URL],
+            [PROFILE_FOLLOW, self.another, FOLLOW_URL],
+            [PROFILE_UNFOLLOW, self.client, self.REDIRECT_UNFOLLOW],
+            [PROFILE_UNFOLLOW, self.another, FOLLOW_URL],
+            [FOLLOW_URL, self.client, self.REDIRECT_LOGIN],
         ]
         for url, client, reverses in urls:
             with self.subTest(url=url, client=client):
