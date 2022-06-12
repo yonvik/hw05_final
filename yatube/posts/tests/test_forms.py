@@ -143,10 +143,11 @@ class PostCreateFormTests(TestCase):
         self.assertEqual(post.text, form_data['text'])
         self.assertEqual(post.group_id, form_data['group'])
         self.assertEqual(post.author, self.post.author)
-        self.assertEqual(post.image.name, 'posts/' + form_data['image'].name)
+        self.assertEqual(
+            post.image.name, f'{app_name}/' + form_data['image'].name)
 
     def test_add_comment(self):
-        """Тест добавления комментария к посту"""
+        """Тест добавления комментария к посту"""g
         comment_count = self.post.comments.count()
         form_data = {
             'text': 'комментарий'
