@@ -9,6 +9,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from posts.models import Group, Post, User, Comment
+from posts.urls import app_name
 
 USER = 'user'
 USER2 = 'another'
@@ -97,7 +98,8 @@ class PostCreateFormTests(TestCase):
         self.assertEqual(post.text, form_data['text'])
         self.assertEqual(post.author, self.author)
         self.assertEqual(post.group.id, form_data['group'])
-        self.assertEqual(post.image.name, 'posts/' + form_data['image'].name)
+        self.assertEqual(
+            post.image.name, f'{app_name}/' + form_data['image'].name)
 
     def test_post_create_correct_context(self):
         """Шаблоны сформированы с правильным контекстом."""
