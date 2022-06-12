@@ -147,7 +147,7 @@ class PostCreateFormTests(TestCase):
             post.image.name, f'{app_name}/' + form_data['image'].name)
 
     def test_add_comment(self):
-        """Тест добавления комментария к посту"""g
+        """Тест добавления комментария к посту"""
         comment_count = self.post.comments.count()
         form_data = {
             'text': 'комментарий'
