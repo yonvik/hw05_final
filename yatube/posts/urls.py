@@ -1,7 +1,6 @@
 from django.urls import path
 
 from . import views
-from core import views as core_views
 
 app_name = 'posts'
 urlpatterns = [
@@ -26,16 +25,6 @@ urlpatterns = [
     path('posts/<int:post_id>/comment/',
          views.add_comment,
          name='add_comment'),
-    path('posts/page_404/',
-         core_views.page_not_found,
-         kwargs={'exception': '404'},
-         name='error_404'),
-    path('posts/af/',
-         core_views.csrf_failure,
-         name='error_403'),
-    path('posts/server/',
-         core_views.server_error,
-         name='error_500'),
     path('follow/',
          views.follow_index,
          name='follow_index'),

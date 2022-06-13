@@ -2,7 +2,7 @@
 {% load cache %}
 {% block title %}Последние обновления на сайте{%endblock%}
 {%block content%}
-  {% include 'posts/includes/switcher.html' with follow=True %}
+{% include 'posts/includes/switcher.html' with index=True %}
   <div class="container py-5">     
     <h3>Последние обновления на сайте </h3>
     {% cache 20 posts page_number %}

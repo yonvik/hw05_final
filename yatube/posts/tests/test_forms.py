@@ -9,7 +9,6 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from posts.models import Group, Post, User, Comment
-from posts.urls import app_name
 
 USER = 'user'
 USER2 = 'another'
@@ -70,7 +69,8 @@ class PostCreateFormTests(TestCase):
         cls.POST_EDIT = reverse('posts:post_edit', args=[cls.group.id])
         cls.POST_DETAL = reverse('posts:post_detail', args=[cls.post.id])
         cls.COMMET_URL = reverse('posts:add_comment', args=[cls.post.id])
-        cls.REDIRECT_LOGIN = f'{LOGIN_URL}?next={cls.COMMET_URL}'
+        cls.REDIRECT_COMMENT = f'{LOGIN_URL}?next={cls.COMMET_URL}'
+        cls.REDIRECT_EDIT = f'{LOGIN_URL}?next={cls.POST_EDIT}'
 
     def test_create_post(self):
         """Тест создания новой записи"""
@@ -85,6 +85,7 @@ class PostCreateFormTests(TestCase):
             'group': self.group.id,
             'image': uploaded
         }
+        posts = set(Post.objects.all())
         response = self.authorized_client.post(
             CREATE,
             data=form_data,
@@ -92,14 +93,13 @@ class PostCreateFormTests(TestCase):
         )
         self.assertRedirects(response, PROFILE)
         self.assertEqual(Post.objects.count(), post_count + 1)
-        posts_exclude = Post.objects.exclude(id=self.post.id)
-        self.assertEqual(posts_exclude.count(), 1)
-        post = posts_exclude[0]
+        posts = set(Post.objects.all()) - posts
+        post = posts.pop()
         self.assertEqual(post.text, form_data['text'])
         self.assertEqual(post.author, self.author)
         self.assertEqual(post.group.id, form_data['group'])
         self.assertEqual(
-            post.image.name, f'{app_name}/' + form_data['image'].name)
+            post.image.name, 'posts/' + form_data['image'].name)
 
     def test_post_create_correct_context(self):
         """Шаблоны сформированы с правильным контекстом."""
@@ -144,27 +144,32 @@ class PostCreateFormTests(TestCase):
         self.assertEqual(post.group_id, form_data['group'])
         self.assertEqual(post.author, self.post.author)
         self.assertEqual(
-            post.image.name, f'{app_name}/' + form_data['image'].name)
+            post.image.name, 'posts/' + form_data['image'].name)
 
     def test_add_comment(self):
         """Тест добавления комментария к посту"""
-        comment_count = self.post.comments.count()
+        comment_count = Comment.objects.count()
         form_data = {
             'text': 'комментарий'
         }
+        comments = set(Comment.objects.all())
         response = self.authorized_client.post(
             self.COMMET_URL,
             data=form_data,
             follow=True
         )
+        comments = set(Comment.objects.all()) - comments
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertRedirects(response, self.POST_DETAL)
         self.assertEqual(self.post.comments.count(), comment_count + 1)
-        comment = Comment.objects.all()[0]
+        comment = comments.pop()
         self.assertEqual(comment.text, form_data['text'])
+        self.assertEqual(self.post, comment.post)
+        self.assertEqual(self.author, comment.author)
 
     def test_add_comment_not_login_user(self):
         """Тест создания комментария только авторизированным пользователем"""
+        Comment.objects.all().delete()
         form_data = {
             'text': 'комментарий'
         }
@@ -173,51 +178,33 @@ class PostCreateFormTests(TestCase):
             data=form_data,
             follow=True
         )
-        self.assertRedirects(response, self.REDIRECT_LOGIN)
+        self.assertRedirects(response, self.REDIRECT_COMMENT)
         self.assertEqual(Comment.objects.count(), 0)
 
-    def test_post_edit_guest(self):
-        """Тест анонима отредактировать пост"""
+    def test_post_edit_guest_another(self):
+        """Тест анонима, не-автора отредактировать пост"""
         uploaded = SimpleUploadedFile(
             name='small2.gif',
             content=SMALL_GIF,
             content_type='image/gif'
         )
+        clients = {
+            self.guest_client: self.REDIRECT_EDIT,
+            self.another_client: self.POST_DETAL
+        }
         form_data = {
-            'text': self.post.text,
+            'text': 'Попытка отредактировать',
             'group': self.group_2.id,
             'image': uploaded
         }
         post = Post.objects.get(id=self.post.id)
-        response = self.guest_client.post(
-            self.COMMET_URL,
-            data=form_data,
-            follow=True
-        )
-        self.assertRedirects(response, self.REDIRECT_LOGIN)
-        self.assertEqual(post.text, self.post.text)
-        self.assertEqual(post.group, self.post.group)
-        self.assertEqual(post.image, self.post.image)
-
-    def test_post_edit_another(self):
-        """Тест не-автора отредактировать пост"""
-        uploaded = SimpleUploadedFile(
-            name='small2.gif',
-            content=SMALL_GIF,
-            content_type='image/gif'
-        )
-        form_data = {
-            'text': self.post.text,
-            'group': self.group_2.id,
-            'image': uploaded
-        }
-        post = Post.objects.get(id=self.post.id)
-        response = self.another_client.post(
-            self.COMMET_URL,
-            data=form_data,
-            follow=True
-        )
-        self.assertRedirects(response, self.POST_DETAL)
-        self.assertEqual(post.text, self.post.text)
-        self.assertEqual(post.group, self.post.group)
-        self.assertEqual(post.image, self.post.image)
+        for client, urls in clients.items():
+            with self.subTest(user=client, urls=urls):
+                response = client.post(
+                    self.POST_EDIT, data=form_data, follow=True
+                )
+                self.assertRedirects(response, urls)
+                self.assertEqual(post.text, self.post.text)
+                self.assertEqual(post.author, self.post.author)
+                self.assertEqual(post.group, self.post.group)
+                self.assertEqual(post.image, self.post.image)

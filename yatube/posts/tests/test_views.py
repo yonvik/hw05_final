@@ -137,35 +137,22 @@ class TaskPagesTests(TestCase):
         content_cache_clear = self.authorized_client.get(INDEX_URL).content
         self.assertNotEqual(content_add, content_cache_clear)
 
-
-class PaginatorViewsTest(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.author = User.objects.create_user(username=USER)
-        cls.group = Group.objects.create(
-            title='Заголовок',
-            slug=SLUG2,
-            description='Описание')
-        cls.authorized_client = Client()
-        cls.authorized_client.force_login(cls.author)
+    def test_first_page_contains_ten_posts(self):
         Post.objects.bulk_create(Post(
             text=f'Тестовый пост {i}',
-            author=cls.author,
-            group=cls.group
+            author=self.author,
+            group=self.group
         ) for i in range(PAGE_SIZE + 3))
-
-    def test_first_page_contains_ten_posts(self):
         """Тестирование пагинатора"""
         list_urls = [
             [INDEX_URL, PAGE_SIZE],
-            [INDEX_URL + '?page=2', 3],
+            [INDEX_URL + '?page=2', 4],
             [GROUP_SLUG2, PAGE_SIZE],
             [GROUP_SLUG2 + '?page=2', 3],
             [PROFILE_URL, PAGE_SIZE],
-            [PROFILE_URL + '?page=2', 3],
+            [PROFILE_URL + '?page=2', 4],
             [FOLLOW_URL, PAGE_SIZE],
-            [FOLLOW_URL + '?page=2', 3]
+            [FOLLOW_URL + '?page=2', 4]
         ]
         Follow.objects.create(user=self.author, author=self.author)
         for page, urls in list_urls:
@@ -174,38 +161,16 @@ class PaginatorViewsTest(TestCase):
                     self.authorized_client.get(page).context.get(
                         'page_obj').object_list), urls)
 
-
-class FollowViewsTest(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.autor = User.objects.create(username=USER)
-        cls.follower = User.objects.create(username=USER2)
-        cls.post = Post.objects.create(
-            text='Тестовая подписка',
-            author=cls.autor,
-        )
-        cls.author_client = Client()
-        cls.author_client.force_login(cls.autor)
-        cls.follower_client = Client()
-        cls.follower_client.force_login(cls.follower)
-
     def test_follow_on_authors(self):
         """Тест записей у тех кто подписан."""
-        Follow.objects.create(
-            user=self.follower,
-            author=self.autor)
-        self.follower_client.get(FOLLOW_URL)
-        self.assertTrue(
-            Follow.objects.filter(user=self.follower, author=self.autor)
-        )
+        Follow.objects.all().delete()
+        self.authorized_client.get(PROFILE_FOLLOW)
+        self.assertEqual(Follow.objects.count(), 1)
 
     def test_unfollow_on_user(self):
         """Тест отписки от пользователя."""
         Follow.objects.create(
-            user=self.autor,
+            user=self.author,
             author=self.follower)
-        self.follower_client.get(PROFILE_UNFOLLOW)
-        self.assertFalse(
-            Follow.objects.filter(user=self.follower, author=self.autor)
-        )
+        self.authorized_client.get(PROFILE_UNFOLLOW)
+        self.assertEqual(Follow.objects.count(), 0)
