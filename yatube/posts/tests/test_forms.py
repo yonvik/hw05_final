@@ -201,7 +201,6 @@ class PostCreateFormTests(TestCase):
             'image': uploaded
         }
         post = Post.objects.exclude()[0]
-        print(post)
         for client, urls in clients.items():
             with self.subTest(user=client, urls=urls):
                 response = client.post(
