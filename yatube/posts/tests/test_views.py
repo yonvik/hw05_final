@@ -64,7 +64,7 @@ class TaskPagesTests(TestCase):
         cls.authorized_client.force_login(cls.post.author)
         cls.follower = User.objects.create(username=USER2)
         cls.follower_client = Client()
-        cls.follower_client.force_login(cls.author)
+        cls.follower_client.force_login(cls.follower)
         cls.PROFILE_FOLLOW = reverse('posts:profile_follow',
                                      args=[USER2])
 
@@ -137,7 +137,7 @@ class TaskPagesTests(TestCase):
         content_cache_clear = self.authorized_client.get(INDEX_URL).content
         self.assertNotEqual(content_add, content_cache_clear)
 
-    def test_first_page_contains_ten_posts(self):
+    def test_paginator(self):
         Post.objects.bulk_create(Post(
             text=f'Тестовый пост {i}',
             author=self.author,
@@ -162,15 +162,17 @@ class TaskPagesTests(TestCase):
                         'page_obj').object_list), urls)
 
     def test_follow_on_authors(self):
-        """Тест записей у тех кто подписан."""
+        """Тест - пользователь может подписаться на автора"""
         Follow.objects.all().delete()
         self.authorized_client.get(PROFILE_FOLLOW)
-        self.assertEqual(Follow.objects.count(), 1)
+        self.assertIs(Follow.objects.filter(
+            user=self.author, author=self.follower).exists(), True)
 
     def test_unfollow_on_user(self):
-        """Тест отписки от пользователя."""
+        """Тест - пользователь может отписаться от автора"""
         Follow.objects.create(
             user=self.author,
             author=self.follower)
         self.authorized_client.get(PROFILE_UNFOLLOW)
-        self.assertEqual(Follow.objects.count(), 0)
+        self.assertIs(Follow.objects.filter(
+            user=self.author, author=self.follower).exists(), False)

@@ -13,6 +13,7 @@ from posts.models import Group, Post, User, Comment
 USER = 'user'
 USER2 = 'another'
 INDEX_URL = reverse('posts:index')
+POSTS = 'posts'
 CREATE = reverse('posts:post_create')
 PROFILE = reverse('posts:profile', args=[USER])
 LOGIN_URL = reverse('login')
@@ -94,12 +95,13 @@ class PostCreateFormTests(TestCase):
         self.assertRedirects(response, PROFILE)
         self.assertEqual(Post.objects.count(), post_count + 1)
         posts = set(Post.objects.all()) - posts
+        self.assertEqual(len(posts), 1)
         post = posts.pop()
         self.assertEqual(post.text, form_data['text'])
         self.assertEqual(post.author, self.author)
         self.assertEqual(post.group.id, form_data['group'])
         self.assertEqual(
-            post.image.name, 'posts/' + form_data['image'].name)
+            post.image.name, f'{POSTS}/' + form_data['image'].name)
 
     def test_post_create_correct_context(self):
         """Шаблоны сформированы с правильным контекстом."""
@@ -144,7 +146,7 @@ class PostCreateFormTests(TestCase):
         self.assertEqual(post.group_id, form_data['group'])
         self.assertEqual(post.author, self.post.author)
         self.assertEqual(
-            post.image.name, 'posts/' + form_data['image'].name)
+            post.image.name, f'{POSTS}/' + form_data['image'].name)
 
     def test_add_comment(self):
         """Тест добавления комментария к посту"""
@@ -162,6 +164,7 @@ class PostCreateFormTests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertRedirects(response, self.POST_DETAL)
         self.assertEqual(self.post.comments.count(), comment_count + 1)
+        self.assertEqual(len(comments), 1)
         comment = comments.pop()
         self.assertEqual(comment.text, form_data['text'])
         self.assertEqual(self.post, comment.post)
@@ -197,7 +200,8 @@ class PostCreateFormTests(TestCase):
             'group': self.group_2.id,
             'image': uploaded
         }
-        post = Post.objects.get(id=self.post.id)
+        post = Post.objects.exclude()[0]
+        print(post)
         for client, urls in clients.items():
             with self.subTest(user=client, urls=urls):
                 response = client.post(
