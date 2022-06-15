@@ -165,8 +165,8 @@ class TaskPagesTests(TestCase):
         """Тест - пользователь может подписаться на автора"""
         Follow.objects.all().delete()
         self.authorized_client.get(PROFILE_FOLLOW)
-        self.assertIs(Follow.objects.filter(
-            user=self.author, author=self.follower).exists(), True)
+        self.assertTrue(Follow.objects.filter(
+            user=self.author, author=self.follower).exists())
 
     def test_unfollow_on_user(self):
         """Тест - пользователь может отписаться от автора"""
@@ -174,5 +174,5 @@ class TaskPagesTests(TestCase):
             user=self.author,
             author=self.follower)
         self.authorized_client.get(PROFILE_UNFOLLOW)
-        self.assertIs(Follow.objects.filter(
-            user=self.author, author=self.follower).exists(), False)
+        self.assertFalse(Follow.objects.filter(
+            user=self.author, author=self.follower).exists())

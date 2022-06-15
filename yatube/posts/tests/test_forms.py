@@ -13,7 +13,6 @@ from posts.models import Group, Post, User, Comment
 USER = 'user'
 USER2 = 'another'
 INDEX_URL = reverse('posts:index')
-POSTS = 'posts'
 CREATE = reverse('posts:post_create')
 PROFILE = reverse('posts:profile', args=[USER])
 LOGIN_URL = reverse('login')
@@ -101,7 +100,7 @@ class PostCreateFormTests(TestCase):
         self.assertEqual(post.author, self.author)
         self.assertEqual(post.group.id, form_data['group'])
         self.assertEqual(
-            post.image.name, f'{POSTS}/' + form_data['image'].name)
+            post.image.name.split('/')[-1], form_data['image'].name)
 
     def test_post_create_correct_context(self):
         """Шаблоны сформированы с правильным контекстом."""
@@ -146,7 +145,7 @@ class PostCreateFormTests(TestCase):
         self.assertEqual(post.group_id, form_data['group'])
         self.assertEqual(post.author, self.post.author)
         self.assertEqual(
-            post.image.name, f'{POSTS}/' + form_data['image'].name)
+            post.image.name.split('/')[-1], form_data['image'].name)
 
     def test_add_comment(self):
         """Тест добавления комментария к посту"""
@@ -193,19 +192,19 @@ class PostCreateFormTests(TestCase):
         )
         clients = {
             self.guest_client: self.REDIRECT_EDIT,
-            self.another_client: self.POST_DETAL
+            self.another_client: self.POST_DETAL,
         }
         form_data = {
             'text': 'Попытка отредактировать',
-            'group': self.group_2.id,
+            'group': self.group.id,
             'image': uploaded
         }
-        post = Post.objects.exclude()[0]
         for client, urls in clients.items():
             with self.subTest(user=client, urls=urls):
                 response = client.post(
                     self.POST_EDIT, data=form_data, follow=True
                 )
+                post = Post.objects.get(id=self.post.id)
                 self.assertRedirects(response, urls)
                 self.assertEqual(post.text, self.post.text)
                 self.assertEqual(post.author, self.post.author)
